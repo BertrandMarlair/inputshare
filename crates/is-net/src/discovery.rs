@@ -100,6 +100,12 @@ pub fn interfaces() -> Vec<Interface> {
 fn bind_listener(port: u16, on: &[Interface]) -> Result<UdpSocket> {
     let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
     socket.set_reuse_address(true)?;
+    // And `SO_REUSEPORT` on the BSDs, macOS included, where `SO_REUSEADDR` alone
+    // does not let a second socket bind a port that is already held. Without it
+    // the second binder gets "address already in use" instead of a share of the
+    // datagrams.
+    #[cfg(unix)]
+    let _ = socket.set_reuse_port(true);
     socket.set_nonblocking(true)?;
     let _ = socket.set_broadcast(true);
     socket.bind(&SocketAddr::from((Ipv4Addr::UNSPECIFIED, port)).into())?;
@@ -131,6 +137,8 @@ fn bind_listener(port: u16, on: &[Interface]) -> Result<UdpSocket> {
 fn bind_sender(address: Ipv4Addr) -> Result<UdpSocket> {
     let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
     socket.set_reuse_address(true)?;
+    #[cfg(unix)]
+    let _ = socket.set_reuse_port(true);
     socket.set_nonblocking(true)?;
     let _ = socket.set_broadcast(true);
     socket.set_multicast_if_v4(&address)?;

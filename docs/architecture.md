@@ -15,7 +15,7 @@ shaped by that.
 | `is-agent` | implemented | Owns the workspace on this machine: the document on disk, the peer connections, who is reachable. Registers autostart. |
 | `is-cli` | implemented | `inputshare` — inspect and edit the workspace from a terminal, and a `demo` that walks the requirements end to end. |
 | `is-ui` | implemented | Tauri desktop app over the agent. Drag-and-drop topology, pairing, per-machine keyboard and mouse assignment, settings. |
-| `is-input` | implemented (Windows, macOS untested) | Real monitor layout, low-level capture and replay: hooks plus raw input on Windows, `CGEventTap` plus `CGEventPost` on macOS, with key codes translated between them. Linux reports honestly that it cannot yet. |
+| `is-input` | implemented (Windows, macOS) | Real monitor layout, low-level capture and replay: hooks plus raw input on Windows, `CGEventTap` plus `CGEventPost` on macOS, with key codes translated between them. On macOS suppression also detaches the mouse from the cursor, because a tap that swallows an event cannot un-move a cursor the HID system has already moved. Linux reports honestly that it cannot yet. |
 
 The split exists so the agent has no dependency on the UI (requirement 4) and so
 the part that must be correct — convergence and persistence — is testable without
