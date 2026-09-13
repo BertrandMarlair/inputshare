@@ -52,8 +52,10 @@ fi
 
 # -------------------------------------------------------------------- build
 
-say "Building $APP_NAME…"
-(cd "$ROOT/crates/is-ui" && cargo tauri build --bundles app "${TARGET_ARGS[@]}")
+say "Building $APP_NAME"
+# ${a[@]+"${a[@]}"} rather than "${a[@]}": bash 3.2, which is the bash macOS
+# ships, treats an empty array as unset and set -u then kills the script.
+(cd "$ROOT/crates/is-ui" && cargo tauri build --bundles app ${TARGET_ARGS[@]+"${TARGET_ARGS[@]}"})
 
 APP="$BUNDLE_DIR/$APP_NAME.app"
 [ -d "$APP" ] || die "The build finished but $APP is not there."
