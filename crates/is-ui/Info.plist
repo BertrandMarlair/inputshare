@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Merged into the bundle's Info.plist by the Tauri bundler, which looks for this
+  file next to tauri.conf.json.
+
+  NSLocalNetworkUsageDescription is not decoration. Since macOS 15 every
+  application needs the user's permission to talk to other machines on the local
+  network, and an application without this key is refused quietly: multicast
+  announcements go nowhere, direct connections to a machine on the same subnet
+  fail, and nothing anywhere says why. This is the text macOS shows when it asks.
+-->
+<plist version="1.0">
+<dict>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>InputShare finds the computers you paired with on this network and connects to them directly. Without this it cannot see them at all.</string>
+</dict>
+</plist>

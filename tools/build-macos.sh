@@ -94,10 +94,22 @@ Installing it
   The first launch: right-click the app and choose Open, because it is not
   signed with a paid Developer ID and a double-click will be refused.
 
-Two permissions, both required, neither of which the app can grant itself
-  System Settings > Privacy & Security > Accessibility      -> InputShare
-  System Settings > Privacy & Security > Input Monitoring    -> InputShare
+Three permissions, all required, none of which the app can grant itself
+  System Settings > Privacy & Security > Accessibility     -> InputShare
+  System Settings > Privacy & Security > Input Monitoring   -> InputShare
+  System Settings > Privacy & Security > Local Network      -> InputShare
+
   Without Accessibility the app cannot read or take over the keyboard and
-  mouse, and says so. Grant them, then quit and reopen the app.
+  mouse, and it says so. Without Local Network it cannot see the other
+  computers at all, and macOS refuses it in silence — no error, nothing in
+  the list, as though the network were empty. Grant all three, then quit and
+  reopen the app.
+
+If the other machine can never connect to this one
+  macOS asks once whether to accept incoming connections, and remembers a
+  "Deny" forever without ever asking again. To check, and to allow it:
+
+    /usr/libexec/ApplicationFirewall/socketfilterfw --getappblocked /Applications/InputShare.app
+    sudo /usr/libexec/ApplicationFirewall/socketfilterfw --unblockapp /Applications/InputShare.app
 
 NOTES

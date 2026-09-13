@@ -546,8 +546,14 @@ pub fn set_cursor_position(x: i32, y: i32) -> Result<()> {
     // Warping decouples the cursor from the mouse for a quarter of a second,
     // during which the local mouse appears dead. Reconnecting them immediately
     // is the documented way out, and without it every crossing feels broken.
-    unsafe {
-        CGAssociateMouseAndMouseCursorPosition(true);
+    //
+    // Unless the pointer is deliberately detached because it is on another
+    // computer, in which case reattaching here would undo the suppression the
+    // sharing loop asked for.
+    if !DETACHED.load(Ordering::SeqCst) {
+        unsafe {
+            CGAssociateMouseAndMouseCursorPosition(true);
+        }
     }
     remember(x, y);
     Ok(())
@@ -557,6 +563,8 @@ pub fn set_cursor_position(x: i32, y: i32) -> Result<()> {
 
 /// Whether captured input is swallowed instead of also acting locally.
 static SUPPRESSING: AtomicBool = AtomicBool::new(false);
+/// Whether the physical mouse has been unhooked from this Mac's cursor.
+static DETACHED: AtomicBool = AtomicBool::new(false);
 /// Last time the owner said it was still alive, in milliseconds.
 static WATCHDOG: AtomicU64 = AtomicU64::new(0);
 /// The run loop the tap is attached to, so it can be stopped from elsewhere.
@@ -578,6 +586,40 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
+/// Unhooks the physical mouse from this Mac's cursor, or hooks it back up.
+///
+/// Swallowing the event is not enough on macOS, and this is the difference
+/// between the Mac working and the Mac looking haunted. A tap sees an event
+/// *after* the HID system has already moved the cursor with it, so returning
+/// null stops applications from being told about the movement but does not stop
+/// the arrow from sliding across the screen. While the pointer is on another
+/// computer, the Mac's own cursor would wander off on its own.
+///
+/// So the mouse is detached from the cursor for as long as this machine is not
+/// the one the pointer is on. Deltas still arrive — that is the whole point —
+/// they simply stop moving anything here.
+///
+/// Every path that stops suppressing must come back through here, including the
+/// watchdog and the emergency release: a Mac left with its mouse detached is a
+/// Mac whose cursor does not move, which is precisely the emergency the rest of
+/// this file exists to prevent.
+fn detach_pointer(detach: bool) {
+    if DETACHED.swap(detach, Ordering::SeqCst) == detach {
+        return;
+    }
+    unsafe {
+        CGAssociateMouseAndMouseCursorPosition(!detach);
+    }
+}
+
+/// Sets suppression and the pointer attachment together, because they are two
+/// halves of one thing and a path that changed only one of them would either
+/// leak input or freeze the cursor.
+fn set_suppression(suppress: bool) {
+    SUPPRESSING.store(suppress, Ordering::SeqCst);
+    detach_pointer(suppress);
+}
+
 fn suppressing_now() -> bool {
     if !SUPPRESSING.load(Ordering::Relaxed) {
         return false;
@@ -586,7 +628,7 @@ fn suppressing_now() -> bool {
     if now_ms().saturating_sub(last) > WATCHDOG_LIMIT_MS {
         // Fail open, always. A missed keystroke is an annoyance; a machine that
         // ignores its own keyboard is an emergency.
-        SUPPRESSING.store(false, Ordering::Relaxed);
+        set_suppression(false);
         warn!("input capture: owner went quiet, releasing the keyboard and mouse");
         return false;
     }
@@ -624,7 +666,7 @@ impl Capture {
             return Err(Error::AlreadyRunning);
         }
         *sink().lock().expect("sink") = Some(sender);
-        SUPPRESSING.store(false, Ordering::SeqCst);
+        set_suppression(false);
         WATCHDOG.store(now_ms(), Ordering::SeqCst);
         HAVE_LAST.store(false, Ordering::SeqCst);
         HELD_BUTTONS.store(0, Ordering::SeqCst);
@@ -661,7 +703,7 @@ impl Capture {
     /// on. The tap releases on its own if you stop.
     pub fn set_suppressing(&self, suppress: bool) {
         WATCHDOG.store(now_ms(), Ordering::Relaxed);
-        SUPPRESSING.store(suppress, Ordering::Relaxed);
+        set_suppression(suppress);
         if suppress {
             HAVE_LAST.store(false, Ordering::Relaxed);
         }
@@ -680,7 +722,7 @@ impl Capture {
 
 impl Drop for Capture {
     fn drop(&mut self) {
-        SUPPRESSING.store(false, Ordering::SeqCst);
+        set_suppression(false);
         let runloop = RUNLOOP.swap(0, Ordering::SeqCst);
         if runloop != 0 {
             // Safe to call from another thread; it is the documented way to ask
@@ -763,7 +805,7 @@ fn tap_thread(ready: Sender<Result<()>>) {
         CFRelease(tap);
         TAP.store(0, Ordering::SeqCst);
     }
-    SUPPRESSING.store(false, Ordering::SeqCst);
+    set_suppression(false);
     info!("input capture stopped, the event tap is gone");
 }
 
@@ -867,7 +909,8 @@ unsafe extern "C" fn tap_callback(
                 && flags & kCGEventFlagMaskControl != 0
                 && flags & kCGEventFlagMaskAlternate != 0
             {
-                if SUPPRESSING.swap(false, Ordering::Relaxed) {
+                if SUPPRESSING.load(Ordering::Relaxed) {
+                    set_suppression(false);
                     warn!("input capture: emergency release, local input restored");
                 }
                 return event;

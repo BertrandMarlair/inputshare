@@ -8,6 +8,11 @@
 //! the two are not on the same network segment — or something between them is
 //! dropping multicast, which is what the optional address argument is for: it
 //! adds that machine as a direct target and asks it to answer.
+//!
+//! An address argument also gets a direct TCP test against the transport port,
+//! because discovery and pairing fail in different ways for different reasons:
+//! discovery is UDP and can be eaten by an access point that drops multicast,
+//! while pairing is an ordinary TCP connection and is usually a firewall.
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -19,6 +24,8 @@ use is_net::wire::Announcement;
 use tokio::sync::{mpsc, Mutex, Notify};
 
 const PORT: u16 = 47451;
+/// The port a peer accepts pairing and sync connections on.
+const TRANSPORT_PORT: u16 = 47452;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
 async fn main() {
@@ -66,6 +73,7 @@ async fn main() {
         };
         println!("Also asking {target} directly.");
         manual.lock().await.push(target);
+        probe_transport(target.ip()).await;
     }
 
     let machine_id = identity.machine_id;
@@ -147,7 +155,48 @@ async fn main() {
         println!("  - Are both on the same network? Compare the addresses listed above.");
         println!("  - Guest or public Wi-Fi often isolates clients from each other.");
         println!("  - Pass the other machine's address as an argument to reach it directly.");
+        #[cfg(target_os = "macos")]
+        {
+            println!("  - On macOS 15 and later, every application needs permission to");
+            println!("    talk to the local network, and is refused in silence until it");
+            println!("    has it. Check System Settings > Privacy & Security > Local");
+            println!("    Network. This probe and the app are asked for separately.");
+        }
     } else {
         println!("Heard {seen_others} announcement(s) from other machines. Discovery works.");
+    }
+}
+
+/// Can we open the connection pairing actually uses?
+///
+/// Discovery working and pairing working are different questions with different
+/// answers: one is UDP to a group, the other is a TCP connection to a host. A
+/// machine that appears in the list and then refuses to pair has usually been
+/// found by the first and blocked on the second.
+async fn probe_transport(ip: std::net::IpAddr) {
+    let target = SocketAddr::new(ip, TRANSPORT_PORT);
+    print!("  connecting to {target} (the port pairing uses)… ");
+    use std::io::Write as _;
+    let _ = std::io::stdout().flush();
+
+    match tokio::time::timeout(
+        Duration::from_secs(5),
+        tokio::net::TcpStream::connect(target),
+    )
+    .await
+    {
+        Ok(Ok(_)) => println!("open. Pairing can reach this machine."),
+        Ok(Err(error)) => {
+            println!("refused: {error}");
+            println!("    The machine answered, so the network is fine and nothing is");
+            println!("    listening: InputShare is probably not running over there.");
+        }
+        Err(_) => {
+            println!("no answer after 5s.");
+            println!("    Something is dropping the connection rather than refusing it,");
+            println!("    which is what a firewall looks like. On macOS the first");
+            println!("    incoming connection needs approval, and an app that was denied");
+            println!("    once is denied silently afterwards.");
+        }
     }
 }

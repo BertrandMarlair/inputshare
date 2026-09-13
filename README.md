@@ -70,13 +70,21 @@ Honest version:
 |---|---|
 | Discovery, pairing, encryption, reconnection, merge, persistence, autostart | **done, tested** |
 | Input capture and replay on **Windows** | **done**, running across two real machines |
-| Input capture and replay on **macOS** | **written, never run** — see below |
+| Input capture and replay on **macOS** | **done**, crossing works; being shaken out |
 | Input capture and replay on **Linux** | not implemented; it says so rather than failing quietly |
 
-The macOS backend (`CGEventTap`, `CGEventPost`, `CGGetActiveDisplayList`, and a
-key-code table in both directions) is complete and type-checks for
-`aarch64-apple-darwin`, and its key table is covered by tests. It has never
-executed on a Mac. Expect to iterate the first time.
+The macOS backend is a `CGEventTap` for capture, `CGEventPost` for replay,
+`CGGetActiveDisplayList` for the screens, and a key-code table that translates in
+both directions so a PC keyboard produces the key that was physically pressed.
+
+One macOS detail worth writing down, because it is not obvious and it looks like
+a haunting: swallowing an event in a tap does **not** stop the cursor. The HID
+system has already moved it by the time a tap is called, so an app that only
+returns null keeps sliding its own arrow around while the pointer is supposed to
+be on another computer. The mouse has to be detached from the cursor with
+`CGAssociateMouseAndMouseCursorPosition(false)` for as long as this machine is
+not the one the pointer is on — and every path that stops suppressing, watchdog
+and emergency release included, has to attach it again.
 
 ## Install
 
@@ -99,11 +107,17 @@ SDK and signed with Apple's tools. The script ad-hoc signs the app, which is wha
 makes macOS remember the permissions it was granted instead of asking again after
 every rebuild.
 
-macOS then needs two permissions, and no application can grant them to itself:
+macOS then needs three permissions, and no application can grant them to itself:
 
 > System Settings → Privacy & Security → **Accessibility** → InputShare
 >
 > System Settings → Privacy & Security → **Input Monitoring** → InputShare
+>
+> System Settings → Privacy & Security → **Local Network** → InputShare
+
+The last one is the one that wastes an afternoon. Since macOS 15 an application
+is refused the local network in total silence until it is granted: no error, no
+peers, an empty list that looks exactly like a network with nothing on it.
 
 ## Using it
 
@@ -185,12 +199,20 @@ cargo clippy -p is-input -p is-agent -p is-net --target aarch64-apple-darwin --a
 instances on one machine. Icons are generated rather than committed as opaque
 blobs: `node tools/make-icons.mjs`.
 
-Two probes that are safe to run at any time, because neither ever swallows
-anything:
+Probes, all safe to run at any time — none of them ever swallows input:
 
 ```bash
 cargo run -p is-input --example displays        # what this machine's monitors really are
 cargo run -p is-input --example capture_probe   # four seconds of observe-only capture
+cargo run -p is-net   --example netcheck        # which cards, who is heard, who answers
+```
+
+Run `netcheck` on both machines at once when discovery is not working. Give it
+the other machine's address and it also tests the TCP port pairing uses, because
+"cannot see it" and "sees it but cannot pair" are different faults:
+
+```bash
+cargo run -p is-net --example netcheck -- 192.168.1.42
 ```
 
 ## Licence
