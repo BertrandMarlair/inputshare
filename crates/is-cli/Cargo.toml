@@ -1,0 +1,14 @@
+[package]
+name = "is-cli"
+description = "InputShare command line: inspect and exercise the workspace core."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "inputshare"
+path = "src/main.rs"
+
+[dependencies]
+is-core = { path = "../is-core" }

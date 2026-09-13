@@ -1,0 +1,21 @@
+[package]
+name = "is-core"
+description = "InputShare core domain: machine identity, synchronized workspace document, cursor routing, local persistence."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+thiserror.workspace = true
+directories.workspace = true
+ed25519-dalek.workspace = true
+rand.workspace = true
+hex.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile = "3"

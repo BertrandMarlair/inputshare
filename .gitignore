@@ -1,0 +1,9 @@
+/target
+**/target
+Cargo.lock.bak
+node_modules
+dist
+.DS_Store
+*.log
+# Tauri regenerates these on every build.
+crates/is-ui/gen/schemas

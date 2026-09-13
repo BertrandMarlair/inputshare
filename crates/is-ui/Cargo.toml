@@ -1,0 +1,23 @@
+[package]
+name = "is-ui"
+description = "InputShare desktop app: manage the workspace, machines and input assignments."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "inputshare-ui"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+is-core = { path = "../is-core" }
+is-agent = { path = "../is-agent" }
+is-input = { path = "../is-input" }
+tauri = { version = "2", features = [] }
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true

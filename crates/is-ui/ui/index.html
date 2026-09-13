@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>InputShare</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="app" class="app">
+      <header class="topbar">
+        <div class="identity">
+          <h1 id="workspace-name" contenteditable="true" spellcheck="false"></h1>
+          <div class="identity-meta">
+            <span class="chip" id="revision-chip"></span>
+            <span class="chip subtle" id="machine-chip"></span>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <button id="search-network" class="ghost">Search network</button>
+          <button id="toggle-settings" class="ghost">Settings</button>
+        </div>
+      </header>
+
+      <main class="content">
+        <section class="stage">
+          <div class="stage-head">
+            <h2>Layout</h2>
+            <p class="hint">
+              Drag a computer to place it. Edges snap together. Click the
+              canvas to test where the cursor would go.
+            </p>
+          </div>
+          <div class="canvas" id="canvas">
+            <div class="world" id="world"></div>
+          </div>
+          <div class="stage-foot">
+            <div class="legend">
+              <span><i class="dot online"></i>online</span>
+              <span><i class="dot offline"></i>offline, still configured</span>
+              <span><i class="dot local"></i>this computer</span>
+            </div>
+            <span class="chip" id="cursor-owner"></span>
+            <output id="route-readout" class="readout"></output>
+          </div>
+        </section>
+
+        <aside class="side">
+          <div class="side-section">
+            <h2>Computers</h2>
+            <ul class="machines" id="machine-list"></ul>
+          </div>
+
+          <div class="side-section" id="discovered-section">
+            <h2>On this network</h2>
+            <ul class="machines" id="candidate-list"></ul>
+            <p class="fine" id="discovery-hint"></p>
+          </div>
+
+          <div class="side-section" id="settings-panel" hidden>
+            <h2>Settings</h2>
+            <label class="row">
+              <span>This computer's name</span>
+              <input id="setting-machine-name" spellcheck="false" />
+            </label>
+            <label class="row">
+              <span>When an edge leads to an offline computer</span>
+              <select id="setting-offline-edge">
+                <option value="block">Hold the cursor at the edge</option>
+                <option value="skip_over">Skip to the next one along</option>
+              </select>
+            </label>
+            <label class="row switch">
+              <input type="checkbox" id="setting-sharing" />
+              <span>Share this keyboard and mouse</span>
+            </label>
+            <p class="fine" id="sharing-warning">
+              While the pointer is on another computer, this one stops seeing its
+              own keyboard and mouse. Ctrl+Alt+F12 — Control+Option+F12 on a Mac —
+              gives them back at any time. This switch is remembered: a computer
+              that was sharing when it was shut down starts sharing again.
+            </p>
+            <label class="row switch">
+              <input type="checkbox" id="setting-clipboard" />
+              <span>Share the clipboard</span>
+            </label>
+            <label class="row switch">
+              <input type="checkbox" id="setting-autostart" />
+              <span>Start with the computer</span>
+            </label>
+            <div class="row ports">
+              <label>
+                <span>Discovery port</span>
+                <input type="number" id="setting-discovery-port" min="1" max="65535" />
+              </label>
+              <label>
+                <span>Transport port</span>
+                <input type="number" id="setting-transport-port" min="1" max="65535" />
+              </label>
+            </div>
+            <button id="save-settings" class="primary">Apply</button>
+            <hr />
+            <button id="export-backup" class="ghost wide">Export a backup</button>
+            <p class="fine" id="config-path"></p>
+          </div>
+        </aside>
+      </main>
+
+      <footer class="statusbar">
+        <span id="notice" class="notice"></span>
+        <span class="build-note" id="build-note"></span>
+      </footer>
+    </div>
+
+
+    <div id="scan" class="scan" hidden>
+      <div class="scan-sheet" role="dialog" aria-label="Network">
+        <header class="scan-head">
+          <div>
+            <h2>Computers on this network</h2>
+            <p class="scan-sub" id="scan-sub"></p>
+          </div>
+          <div class="scan-head-actions">
+            <button id="scan-rescan" class="ghost">Search again</button>
+            <button id="scan-close" class="primary">Done</button>
+          </div>
+        </header>
+
+        <div class="scan-body">
+          <div class="radar" id="radar">
+            <svg viewBox="0 0 220 220" class="radar-svg" aria-hidden="true">
+              <defs>
+                <linearGradient id="sweepFade" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.42" />
+                  <stop offset="100%" stop-color="var(--accent)" stop-opacity="0" />
+                </linearGradient>
+              </defs>
+              <circle class="ring pulse1" cx="110" cy="110" r="34" />
+              <circle class="ring pulse2" cx="110" cy="110" r="66" />
+              <circle class="ring pulse3" cx="110" cy="110" r="98" />
+              <line class="cross" x1="110" y1="14" x2="110" y2="206" />
+              <line class="cross" x1="14" y1="110" x2="206" y2="110" />
+              <g class="sweep">
+                <path d="M110,110 L110,12 A98,98 0 0,1 179.3,40.7 Z" fill="url(#sweepFade)" />
+              </g>
+              <circle class="hub" cx="110" cy="110" r="4.5" />
+            </svg>
+            <div class="blips" id="blips"></div>
+            <span class="radar-self">this computer</span>
+          </div>
+
+          <div class="scan-side">
+            <h3>Found</h3>
+            <ul class="machines" id="scan-found"></ul>
+            <p class="fine" id="scan-empty"></p>
+
+            <h3>Looking on</h3>
+            <ul class="ifaces" id="scan-interfaces"></ul>
+            <p class="fine" id="interfaces-hint"></p>
+
+            <h3>Not showing up?</h3>
+            <form id="manual-form" class="manual">
+              <input
+                id="manual-address"
+                placeholder="192.168.1.20"
+                aria-label="Address of the other computer"
+                spellcheck="false"
+              />
+              <button class="ghost" type="submit">Add</button>
+            </form>
+            <ul class="manual-list" id="manual-list"></ul>
+            <p class="fine" id="manual-status"></p>
+            <p class="fine">
+              Type the other computer's address to reach it directly. Some
+              networks — guest Wi-Fi especially — stop computers from seeing each
+              other, and a direct address goes around that. It only needs
+              entering on one of the two.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script src="scan.js"></script>
+  </body>
+</html>
